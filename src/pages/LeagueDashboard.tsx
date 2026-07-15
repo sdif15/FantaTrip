@@ -12,6 +12,7 @@ export default function LeagueDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isMember, setIsMember] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const checkMembership = async () => {
@@ -23,6 +24,7 @@ export default function LeagueDashboard() {
         
         if (snap.exists()) {
           setIsMember(true);
+          setIsAdmin(snap.data().role === 'admin');
         } else {
           navigate('/hub');
         }
@@ -54,12 +56,22 @@ export default function LeagueDashboard() {
             </h1>
             <p className="text-gray-400 mt-1 text-sm">ID Lega: {leagueId}</p>
           </div>
-          <button 
-            onClick={() => navigate('/hub')}
-            className="px-4 py-2 bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:border-purple-500 rounded-lg transition-all"
-          >
-            Torna all'Hub
-          </button>
+          <div className="flex gap-3">
+            {isAdmin && (
+              <button 
+                onClick={() => navigate(`/league/${leagueId}/admin`)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-all font-medium"
+              >
+                Admin Panel
+              </button>
+            )}
+            <button 
+              onClick={() => navigate('/hub')}
+              className="px-4 py-2 bg-gray-900 border border-gray-800 text-gray-300 hover:text-white hover:border-purple-500 rounded-lg transition-all"
+            >
+              Torna all'Hub
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

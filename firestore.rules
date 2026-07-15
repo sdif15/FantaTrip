@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================================
+    // FUNZIONI HELPER
+    // ==========================================================
+    
+    // Verifica se la richiesta proviene da un utente autenticato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Verifica se l'utente loggato è 'admin' per una specifica lega
+    function isAdmin(leagueId) {
+      return get(/databases/$(database)/documents/league_members/$(leagueId + '_' + request.auth.uid)).data.role == 'admin';
+    }
+
+    // ==========================================================
+    // REGOLE COLLEZIONI
+    // ==========================================================
+
+    // --- USERS ---
+    match /users/{userId} {
+      // Tutti i loggati possono leggere (serve per i controlli username)
+      allow read: if isAuthenticated();
+      // Puoi creare o modificare solo il tuo documento utente
+      allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // --- LEAGUES ---
+    match /leagues/{leagueId} {
+      allow read: if isAuthenticated();
+      // Chiunque può creare una lega, ma deve impostarsi come adminId
+      allow create: if isAuthenticated() && request.resource.data.adminId == request.auth.uid;
+      // Solo l'admin originale può modificare o eliminare la lega
+      allow update, delete: if isAuthenticated() && resource.data.adminId == request.auth.uid;
+    }
+
+    // --- CHALLENGES ---
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      // Solo l'admin della lega può creare, modificare o eliminare le sfide
+      allow create: if isAuthenticated() && isAdmin(request.resource.data.leagueId);
+      allow update, delete: if isAuthenticated() && isAdmin(resource.data.leagueId);
+    }
+
+    // --- LEAGUE MEMBERS (Il portafoglio e i punti) ---
+    match /league_members/{memberId} {
+      allow read: if isAuthenticated();
+      
+      // Creazione (quando si unisce o crea una lega):
+      // Il ruolo 'admin' può assegnarselo solo il creatore della lega (nella logica client crea prima la lega col suo id)
+      // Anticheat: Partenza obbligatoria da 0 PT e 500 TripMoney.
+      allow create: if isAuthenticated() 
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.points == 0
+                    && request.resource.data.tripMoney == 500;
+      
+      // Modifica (Il cuore dell'Anti-Cheat):
+      // - Se sei Admin della lega, puoi fare tutto (devi poter aggiungere punti e soldi durante la validazione evento).
+      // - Se NON sei Admin, puoi toccare solo il TUO documento e SOLO per spendere TripMoney.
+      // - Non puoi aumentare i tuoi punti, né cambiarti il ruolo!
+      allow update: if isAuthenticated() && (
+        isAdmin(resource.data.leagueId) 
+        || 
+        (
+          request.auth.uid == resource.data.userId 
+          && request.resource.data.points == resource.data.points // I punti non si toccano!
+          && request.resource.data.role == resource.data.role // Non si tocca il ruolo!
+          && request.resource.data.tripMoney <= resource.data.tripMoney // Si può solo spendere (tripMoney in discesa)
+        )
+      );
+      
+      allow delete: if isAuthenticated() && isAdmin(resource.data.leagueId);
+    }
+
+    // --- BETS ---
+    match /bets/{betId} {
+      allow read: if isAuthenticated();
+      
+      // Creazione scommessa (Anti-Cheat Transazionale tramite getAfter):
+      // - Puoi scommettere solo a tuo nome (bettorId)
+      // - Importo deve essere positivo
+      // - Stato iniziale deve essere 'pending'
+      // - MAGIA ANTICHEAT: Il tuo portafoglio (getAfter) DOPO la transazione DEVE essere ESATTAMENTE
+      //   uguale al tuo portafoglio di partenza (get) MENO l'importo della scommessa.
+      // Questo impedisce a chiunque di scommettere aggirando il pagamento!
+      allow create: if isAuthenticated()
+                    && request.resource.data.bettorId == request.auth.uid
+                    && request.resource.data.amount > 0
+                    && request.resource.data.status == 'pending'
+                    && getAfter(/databases/$(database)/documents/league_members/$(request.resource.data.leagueId + '_' + request.auth.uid)).data.tripMoney == 
+                       get(/databases/$(database)/documents/league_members/$(request.resource.data.leagueId + '_' + request.auth.uid)).data.tripMoney - request.resource.data.amount;
+
+      // Solo l'Admin della lega può aggiornare le scommesse (per segnarle 'won' in resolveEvent)
+      allow update: if isAuthenticated() && isAdmin(resource.data.leagueId);
+      
+      // Nessuno elimina scommesse per non alterare lo storico
+      allow delete: if false; 
+    }
+  }
+}

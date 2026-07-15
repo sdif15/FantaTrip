@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction, writeBatch, increment } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { User, League, LeagueMember, Bet } from '../types';
 
@@ -55,6 +55,67 @@ export async function placeBet(
   });
 
   return newBetRef.id;
+}
+
+export async function createChallenge(challengeData: Omit<Challenge, 'id'>): Promise<string> {
+  const newRef = doc(collection(db, 'challenges'));
+  const challenge: Challenge = {
+    ...challengeData,
+    id: newRef.id,
+  };
+  await setDoc(newRef, challenge);
+  return newRef.id;
+}
+
+export async function resolveEvent(leagueId: string, targetUserId: string, challengeId: string): Promise<void> {
+  const targetMemberId = `${leagueId}_${targetUserId}`;
+  const targetMemberRef = doc(db, 'league_members', targetMemberId);
+  const challengeRef = doc(db, 'challenges', challengeId);
+
+  // Leggiamo la challenge per sapere quanti punti vale
+  const challengeDoc = await getDoc(challengeRef);
+  if (!challengeDoc.exists()) throw new Error("Sfida non trovata.");
+  const challengePoints = challengeDoc.data().points;
+
+  // Cerchiamo le scommesse pendenti per questo evento
+  const betsQuery = query(
+    collection(db, 'bets'), 
+    where('leagueId', '==', leagueId),
+    where('targetUserId', '==', targetUserId),
+    where('challengeId', '==', challengeId),
+    where('status', '==', 'pending')
+  );
+  const pendingBetsSnap = await getDocs(betsQuery);
+
+  const batch = writeBatch(db);
+
+  // 1. Assegna l'intero ammontare dei Punti della sfida al bersaglio
+  batch.update(targetMemberRef, {
+    points: increment(challengePoints)
+  });
+
+  // 2. Risolvi ogni scommessa
+  pendingBetsSnap.docs.forEach(betDoc => {
+    const betData = betDoc.data();
+    const bettorMemberId = `${leagueId}_${betData.bettorId}`;
+    const bettorMemberRef = doc(db, 'league_members', bettorMemberId);
+
+    // Segna vinta
+    batch.update(betDoc.ref, {
+      status: 'won'
+    });
+
+    const winnings = Math.round(betData.amount * betData.odds);
+    const pointsWon = Math.floor(challengePoints / 2); // metà dei punti della sfida
+
+    // Aggiungi soldi e punti allo scommettitore
+    batch.update(bettorMemberRef, {
+      tripMoney: increment(winnings),
+      points: increment(pointsWon)
+    });
+  });
+
+  await batch.commit();
 }
 
 export async function createUserProfile(userId: string, data: Omit<User, 'id'>): Promise<void> {

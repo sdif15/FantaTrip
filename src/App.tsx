@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Onboarding from './components/Onboarding';
 import LeagueHub from './pages/LeagueHub';
 import LeagueDashboard from './pages/LeagueDashboard';
+import LeagueAdminPanel from './pages/LeagueAdminPanel';
 
 const ProtectedRoute = ({ requireDbUser = true }: { requireDbUser?: boolean }) => {
   const { firebaseUser, dbUser, loading } = useAuth();
@@ -45,6 +46,7 @@ function App() {
           <Route element={<ProtectedRoute requireDbUser={true} />}>
             <Route path="/hub" element={<LeagueHub />} />
             <Route path="/league/:leagueId/dashboard" element={<LeagueDashboard />} />
+            <Route path="/league/:leagueId/admin" element={<LeagueAdminPanel />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
