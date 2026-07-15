@@ -10,11 +10,11 @@ export async function checkUsernameAvailability(username: string): Promise<boole
 }
 
 export async function placeBet(
-  leagueId: string, 
-  bettorId: string, 
-  targetUserId: string, 
-  challengeId: string, 
-  amount: number, 
+  leagueId: string,
+  bettorId: string,
+  targetUserId: string,
+  challengeId: string,
+  amount: number,
   odds: number,
   multiplier: number = 1
 ): Promise<string> {
@@ -29,7 +29,7 @@ export async function placeBet(
     }
 
     const memberData = memberDoc.data() as LeagueMember;
-    
+
     if (memberData.tripMoney < amount) {
       throw new Error("Fondi insufficienti (TripMoney).");
     }
@@ -52,7 +52,7 @@ export async function placeBet(
       status: 'pending',
       createdAt: Date.now()
     };
-    
+
     transaction.set(newBetRef, bet);
   });
 
@@ -100,7 +100,7 @@ export async function updateMemberRole(leagueId: string, userId: string, newRole
 export async function kickMember(leagueId: string, userId: string): Promise<void> {
   const memberId = `${leagueId}_${userId}`;
   const memberRef = doc(db, 'league_members', memberId);
-  
+
   // Non si può eliminare il creatore (l'unico con userId == adminId nella lega vera e propria,
   // ma per sicurezza l'admin rimuove solo i 'player' o 'co-admin' dall'UI).
   await deleteDoc(memberRef);
@@ -123,7 +123,7 @@ export async function resolveEvent(leagueId: string, targetUserId: string, chall
 
   // Cerchiamo le scommesse pendenti per questo evento
   const betsQuery = query(
-    collection(db, 'bets'), 
+    collection(db, 'bets'),
     where('leagueId', '==', leagueId),
     where('targetUserId', '==', targetUserId),
     where('challengeId', '==', challengeId),
@@ -152,10 +152,10 @@ export async function resolveEvent(leagueId: string, targetUserId: string, chall
 
   // 3. Risolvi ogni scommessa (verificando la scadenza di 12h)
   const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-  
+
   pendingBetsSnap.docs.forEach(betDoc => {
     const betData = betDoc.data();
-    
+
     // Se la scommessa è scaduta, marcala come persa e non pagare
     if (Date.now() - betData.createdAt > TWELVE_HOURS) {
       batch.update(betDoc.ref, { status: 'lost' });
@@ -201,11 +201,11 @@ export async function assignCustomPoints(leagueId: string, userId: string, point
 export async function revokeEvent(leagueId: string, eventId: string): Promise<void> {
   const eventRef = doc(db, 'completed_challenges', eventId);
   const eventSnap = await getDoc(eventRef);
-  
+
   if (!eventSnap.exists()) {
     throw new Error("Evento non trovato o già rimosso.");
   }
-  
+
   const eventData = eventSnap.data();
   if (eventData.leagueId !== leagueId) {
     throw new Error("Permessi insufficienti.");
@@ -215,7 +215,7 @@ export async function revokeEvent(leagueId: string, eventId: string): Promise<vo
   const targetMemberRef = doc(db, 'league_members', targetMemberId);
 
   const batch = writeBatch(db);
-  
+
   // Sottrarre i punti dal target user
   batch.update(targetMemberRef, {
     points: increment(-eventData.points)
@@ -249,7 +249,7 @@ export async function getUserLeagues(userId: string): Promise<LeagueMember[]> {
   const q = query(membersRef, where('userId', '==', userId));
   const snap = await getDocs(q);
   const members = snap.docs.map(doc => doc.data() as LeagueMember);
-  
+
   // Recupera i nomi delle leghe
   const enhanced = await Promise.all(members.map(async m => {
     const lDoc = await getDoc(doc(db, 'leagues', m.leagueId));
@@ -258,7 +258,7 @@ export async function getUserLeagues(userId: string): Promise<LeagueMember[]> {
       leagueName: lDoc.exists() ? lDoc.data().name : 'Lega Sconosciuta'
     };
   }));
-  
+
   return enhanced;
 }
 
@@ -266,20 +266,20 @@ export async function distributeDailyAllowance(leagueId: string): Promise<void> 
   const leagueRef = doc(db, 'leagues', leagueId);
   const leagueSnap = await getDoc(leagueRef);
   if (!leagueSnap.exists()) throw new Error("Lega non trovata");
-  
+
   const lastAllowance = leagueSnap.data().lastAllowanceDate || 0;
   const ONE_DAY = 24 * 60 * 60 * 1000;
-  
+
   if (Date.now() - lastAllowance < ONE_DAY) {
     throw new Error("Paghetta già distribuita nelle ultime 24 ore!");
   }
 
   const memQ = query(collection(db, 'league_members'), where('leagueId', '==', leagueId));
   const memSnap = await getDocs(memQ);
-  
+
   const batch = writeBatch(db);
   batch.update(leagueRef, { lastAllowanceDate: Date.now() });
-  
+
   memSnap.docs.forEach(docSnap => {
     batch.update(docSnap.ref, { tripMoney: increment(20) });
   });
