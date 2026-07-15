@@ -37,6 +37,7 @@ export default function LeagueAdminPanel() {
   
   // Form Custom Points
   const [customUserId, setCustomUserId] = useState('');
+  const [customPoints, setCustomPoints] = useState<number | ''>('');
   const [customMsg, setCustomMsg] = useState('');
   
   // Form Password
