@@ -4,13 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Onboarding from './components/Onboarding';
 import LeagueHub from './pages/LeagueHub';
-
-// Dashboard Placeholder
-const LeagueDashboard = () => (
-  <div className="min-h-screen bg-gray-950 text-purple-400 flex items-center justify-center text-3xl font-bold">
-    Dashboard Lega in arrivo...
-  </div>
-);
+import LeagueDashboard from './pages/LeagueDashboard';
 
 const ProtectedRoute = ({ requireDbUser = true }: { requireDbUser?: boolean }) => {
   const { firebaseUser, dbUser, loading } = useAuth();
