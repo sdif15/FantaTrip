@@ -7,6 +7,7 @@
  * @returns La quota calcolata.
  */
 export function calculateOdds(challengePoints: number): number {
-  const odds = 1.2 + (challengePoints / 25);
+  const absPoints = Math.abs(challengePoints);
+  const odds = 1.2 + (absPoints / 25);
   return Math.round(odds * 100) / 100;
 }

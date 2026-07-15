@@ -2,12 +2,15 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
 }
 
 export interface League {
   id: string;
   name: string;
-  password?: string;
+  password: string;
   adminId: string;
   createdAt: number;
 }
@@ -19,7 +22,8 @@ export interface LeagueMember {
   username: string;
   points: number;
   tripMoney: number;
-  role: 'admin' | 'player';
+  role: 'admin' | 'co-admin' | 'player';
+  leagueName?: string;
 }
 
 export interface Challenge {
@@ -38,6 +42,7 @@ export interface Bet {
   challengeId: string;
   amount: number;
   odds: number;
+  multiplier?: number;
   status: 'pending' | 'won' | 'lost';
   createdAt: number;
 }

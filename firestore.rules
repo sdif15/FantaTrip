@@ -11,9 +11,10 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Verifica se l'utente loggato è 'admin' per una specifica lega
+    // Verifica se l'utente loggato è 'admin' o 'co-admin' per una specifica lega
     function isAdmin(leagueId) {
-      return get(/databases/$(database)/documents/league_members/$(leagueId + '_' + request.auth.uid)).data.role == 'admin';
+      let role = get(/databases/$(database)/documents/league_members/$(leagueId + '_' + request.auth.uid)).data.role;
+      return role == 'admin' || role == 'co-admin';
     }
 
     // ==========================================================
@@ -98,6 +99,13 @@ service cloud.firestore {
       
       // Nessuno elimina scommesse per non alterare lo storico
       allow delete: if false; 
+    }
+
+    // --- COMPLETED CHALLENGES ---
+    match /completed_challenges/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isAdmin(request.resource.data.leagueId);
+      allow update, delete: if isAuthenticated() && isAdmin(resource.data.leagueId);
     }
   }
 }

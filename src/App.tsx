@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
@@ -6,6 +5,11 @@ import Onboarding from './components/Onboarding';
 import LeagueHub from './pages/LeagueHub';
 import LeagueDashboard from './pages/LeagueDashboard';
 import LeagueAdminPanel from './pages/LeagueAdminPanel';
+import LeaderboardPage from './pages/LeaderboardPage';
+import RulesPage from './pages/RulesPage';
+import BetsHistoryPage from './pages/BetsHistoryPage';
+import ChallengesHistoryPage from './pages/ChallengesHistoryPage';
+import LeagueLayout from './components/LeagueLayout';
 
 const ProtectedRoute = ({ requireDbUser = true }: { requireDbUser?: boolean }) => {
   const { firebaseUser, dbUser, loading } = useAuth();
@@ -45,8 +49,15 @@ function App() {
 
           <Route element={<ProtectedRoute requireDbUser={true} />}>
             <Route path="/hub" element={<LeagueHub />} />
-            <Route path="/league/:leagueId/dashboard" element={<LeagueDashboard />} />
-            <Route path="/league/:leagueId/admin" element={<LeagueAdminPanel />} />
+            
+            <Route element={<LeagueLayout />}>
+              <Route path="/league/:leagueId/dashboard" element={<LeagueDashboard />} />
+              <Route path="/league/:leagueId/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/league/:leagueId/bets" element={<BetsHistoryPage />} />
+              <Route path="/league/:leagueId/history" element={<ChallengesHistoryPage />} />
+              <Route path="/league/:leagueId/rules" element={<RulesPage />} />
+              <Route path="/league/:leagueId/admin" element={<LeagueAdminPanel />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

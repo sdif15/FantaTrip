@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { LeagueMember } from '../types';
+import type { LeagueMember } from '../types';
 
 interface Props {
   leagueId: string;

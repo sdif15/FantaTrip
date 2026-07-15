@@ -1,6 +1,6 @@
-import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction, writeBatch, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction, writeBatch, increment, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { User, League, LeagueMember, Bet } from '../types';
+import type { User, League, LeagueMember, Bet, Challenge } from '../types';
 
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
   const usersRef = collection(db, 'users');
@@ -15,7 +15,8 @@ export async function placeBet(
   targetUserId: string, 
   challengeId: string, 
   amount: number, 
-  odds: number
+  odds: number,
+  multiplier: number = 1
 ): Promise<string> {
   const bettorMemberId = `${leagueId}_${bettorId}`;
   const bettorMemberRef = doc(db, 'league_members', bettorMemberId);
@@ -47,6 +48,7 @@ export async function placeBet(
       challengeId,
       amount,
       odds,
+      multiplier,
       status: 'pending',
       createdAt: Date.now()
     };
@@ -67,7 +69,35 @@ export async function createChallenge(challengeData: Omit<Challenge, 'id'>): Pro
   return newRef.id;
 }
 
-export async function resolveEvent(leagueId: string, targetUserId: string, challengeId: string): Promise<void> {
+export async function deleteLeague(leagueId: string): Promise<void> {
+  const batch = writeBatch(db);
+
+  // 1. Elimina la lega stessa
+  batch.delete(doc(db, 'leagues', leagueId));
+
+  // 2. Trova e elimina tutti i membri della lega
+  const membersSnap = await getDocs(query(collection(db, 'league_members'), where('leagueId', '==', leagueId)));
+  membersSnap.forEach(d => batch.delete(d.ref));
+
+  // 3. Trova e elimina tutte le sfide
+  const challengesSnap = await getDocs(query(collection(db, 'challenges'), where('leagueId', '==', leagueId)));
+  challengesSnap.forEach(d => batch.delete(d.ref));
+
+  // 4. Trova e elimina tutte le scommesse
+  const betsSnap = await getDocs(query(collection(db, 'bets'), where('leagueId', '==', leagueId)));
+  betsSnap.forEach(d => batch.delete(d.ref));
+
+  // Esegui tutto atomicamente
+  await batch.commit();
+}
+
+export async function updateMemberRole(leagueId: string, userId: string, newRole: 'admin' | 'co-admin' | 'player'): Promise<void> {
+  const memberId = `${leagueId}_${userId}`;
+  const memberRef = doc(db, 'league_members', memberId);
+  await updateDoc(memberRef, { role: newRole });
+}
+
+export async function resolveEvent(leagueId: string, targetUserId: string, challengeId: string, multiplier: number = 1): Promise<void> {
   const targetMemberId = `${leagueId}_${targetUserId}`;
   const targetMemberRef = doc(db, 'league_members', targetMemberId);
   const challengeRef = doc(db, 'challenges', challengeId);
@@ -89,14 +119,42 @@ export async function resolveEvent(leagueId: string, targetUserId: string, chall
 
   const batch = writeBatch(db);
 
-  // 1. Assegna l'intero ammontare dei Punti della sfida al bersaglio
+  // 1. Assegna i Punti della sfida al bersaglio (moltiplicati)
   batch.update(targetMemberRef, {
-    points: increment(challengePoints)
+    points: increment(challengePoints * multiplier)
   });
 
-  // 2. Risolvi ogni scommessa
+  // 2. Registra l'evento nello storico
+  const completedRef = doc(collection(db, 'completed_challenges'));
+  batch.set(completedRef, {
+    id: completedRef.id,
+    leagueId,
+    userId: targetUserId,
+    challengeId,
+    points: challengePoints * multiplier,
+    count: multiplier,
+    timestamp: Date.now()
+  });
+
+  // 3. Risolvi ogni scommessa (verificando la scadenza di 12h)
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+  
   pendingBetsSnap.docs.forEach(betDoc => {
     const betData = betDoc.data();
+    
+    // Se la scommessa è scaduta, marcala come persa e non pagare
+    if (Date.now() - betData.createdAt > TWELVE_HOURS) {
+      batch.update(betDoc.ref, { status: 'lost' });
+      return;
+    }
+
+    // Se l'utente ha scommesso che lo faceva x volte, e l'admin ha validato y volte con y < x
+    // la scommessa è persa!
+    if ((betData.multiplier || 1) > multiplier) {
+      batch.update(betDoc.ref, { status: 'lost' });
+      return;
+    }
+
     const bettorMemberId = `${leagueId}_${betData.bettorId}`;
     const bettorMemberRef = doc(db, 'league_members', bettorMemberId);
 
@@ -106,14 +164,51 @@ export async function resolveEvent(leagueId: string, targetUserId: string, chall
     });
 
     const winnings = Math.round(betData.amount * betData.odds);
-    const pointsWon = Math.floor(challengePoints / 2); // metà dei punti della sfida
+    const pointsWon = Math.ceil(Math.abs(challengePoints) / 2); // Metà dei punti assoluti della sfida
 
-    // Aggiungi soldi e punti allo scommettitore
+    // Aggiungi soldi e punti allo scommettitore (la scommessa premia 1 sola volta anche se l'azione è ripetuta)
     batch.update(bettorMemberRef, {
       tripMoney: increment(winnings),
       points: increment(pointsWon)
     });
   });
+
+  await batch.commit();
+}
+
+export async function assignCustomPoints(leagueId: string, userId: string, pointsDelta: number): Promise<void> {
+  const memberId = `${leagueId}_${userId}`;
+  const memberRef = doc(db, 'league_members', memberId);
+  await updateDoc(memberRef, {
+    points: increment(pointsDelta)
+  });
+}
+
+export async function revokeEvent(leagueId: string, eventId: string): Promise<void> {
+  const eventRef = doc(db, 'completed_challenges', eventId);
+  const eventSnap = await getDoc(eventRef);
+  
+  if (!eventSnap.exists()) {
+    throw new Error("Evento non trovato o già rimosso.");
+  }
+  
+  const eventData = eventSnap.data();
+  if (eventData.leagueId !== leagueId) {
+    throw new Error("Permessi insufficienti.");
+  }
+
+  const targetMemberId = `${leagueId}_${eventData.userId}`;
+  const targetMemberRef = doc(db, 'league_members', targetMemberId);
+
+  const batch = writeBatch(db);
+  
+  // Sottrarre i punti dal target user
+  batch.update(targetMemberRef, {
+    points: increment(-eventData.points)
+  });
+
+  // Eliminare l'evento
+  batch.delete(eventRef);
 
   await batch.commit();
 }
@@ -139,7 +234,43 @@ export async function getUserLeagues(userId: string): Promise<LeagueMember[]> {
   const membersRef = collection(db, 'league_members');
   const q = query(membersRef, where('userId', '==', userId));
   const snap = await getDocs(q);
-  return snap.docs.map(doc => doc.data() as LeagueMember);
+  const members = snap.docs.map(doc => doc.data() as LeagueMember);
+  
+  // Recupera i nomi delle leghe
+  const enhanced = await Promise.all(members.map(async m => {
+    const lDoc = await getDoc(doc(db, 'leagues', m.leagueId));
+    return {
+      ...m,
+      leagueName: lDoc.exists() ? lDoc.data().name : 'Lega Sconosciuta'
+    };
+  }));
+  
+  return enhanced;
+}
+
+export async function distributeDailyAllowance(leagueId: string): Promise<void> {
+  const leagueRef = doc(db, 'leagues', leagueId);
+  const leagueSnap = await getDoc(leagueRef);
+  if (!leagueSnap.exists()) throw new Error("Lega non trovata");
+  
+  const lastAllowance = leagueSnap.data().lastAllowanceDate || 0;
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  
+  if (Date.now() - lastAllowance < ONE_DAY) {
+    throw new Error("Paghetta già distribuita nelle ultime 24 ore!");
+  }
+
+  const memQ = query(collection(db, 'league_members'), where('leagueId', '==', leagueId));
+  const memSnap = await getDocs(memQ);
+  
+  const batch = writeBatch(db);
+  batch.update(leagueRef, { lastAllowanceDate: Date.now() });
+  
+  memSnap.docs.forEach(docSnap => {
+    batch.update(docSnap.ref, { tripMoney: increment(20) });
+  });
+
+  await batch.commit();
 }
 
 // Per entrare in una lega

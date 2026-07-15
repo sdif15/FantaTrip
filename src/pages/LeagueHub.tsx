@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { logout } from '../services/auth';
 import { getUserLeagues, createLeague, createLeagueMember, getLeagueByNameAndPassword } from '../services/db';
-import { LeagueMember } from '../types';
+import type { LeagueMember } from '../types';
 
 export default function LeagueHub() {
   const { firebaseUser, dbUser } = useAuth();
@@ -136,7 +136,9 @@ export default function LeagueHub() {
               <div className="grid sm:grid-cols-2 gap-4">
                 {leagues.map(member => (
                   <div key={member.id} className="bg-gray-900 border border-purple-500/20 hover:border-purple-500/60 p-6 rounded-2xl transition-all group cursor-pointer" onClick={() => navigate(`/league/${member.leagueId}/dashboard`)}>
-                    <h3 className="text-xl font-bold text-white mb-4 group-hover:text-purple-400 transition-colors">ID Lega: {member.leagueId}</h3>
+                    <h3 className="text-xl font-bold text-white mb-4 group-hover:text-purple-400 transition-colors">
+                      {member.leagueName || `Lega: ${member.leagueId}`}
+                    </h3>
                     <div className="flex justify-between text-sm">
                       <div className="text-gray-400">
                         <span className="block text-xs text-gray-500">Ruolo</span>
@@ -165,10 +167,10 @@ export default function LeagueHub() {
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-2 rounded-lg focus:ring-1 focus:ring-purple-600 outline-none transition-all"
                 />
                 <input 
-                  type="password" placeholder="Password (opzionale)" value={createPassword} onChange={e => setCreatePassword(e.target.value)}
+                  type="password" placeholder="Password" value={createPassword} onChange={e => setCreatePassword(e.target.value)} required
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-2 rounded-lg focus:ring-1 focus:ring-purple-600 outline-none transition-all"
                 />
-                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-medium transition-colors">
+                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-medium transition-colors cursor-pointer">
                   Crea e diventa Admin
                 </button>
               </form>
@@ -184,10 +186,10 @@ export default function LeagueHub() {
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-2 rounded-lg focus:ring-1 focus:ring-purple-600 outline-none transition-all"
                 />
                 <input 
-                  type="password" placeholder="Password (se richiesta)" value={joinPassword} onChange={e => setJoinPassword(e.target.value)}
+                  type="password" placeholder="Password" value={joinPassword} onChange={e => setJoinPassword(e.target.value)} required
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-2 rounded-lg focus:ring-1 focus:ring-purple-600 outline-none transition-all"
                 />
-                <button type="submit" className="w-full border border-purple-600 text-purple-400 hover:bg-purple-600/10 py-2 rounded-lg font-medium transition-colors">
+                <button type="submit" className="w-full border border-purple-600 text-purple-400 hover:bg-purple-600/10 py-2 rounded-lg font-medium transition-colors cursor-pointer">
                   Entra nella Lega
                 </button>
               </form>

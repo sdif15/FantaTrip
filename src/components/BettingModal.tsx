@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { useAuth } from '../context/AuthContext';
-import { Challenge, LeagueMember } from '../types';
+import type { Challenge, LeagueMember } from '../types';
 import { calculateOdds } from '../services/oddsCalculator';
 import { placeBet } from '../services/db';
 
@@ -17,12 +17,15 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [targetUserId, setTargetUserId] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
+  const [multiplier, setMultiplier] = useState<number>(1);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const odds = calculateOdds(challenge.points);
+  const baseOdds = calculateOdds(challenge.points);
+  const odds = baseOdds * multiplier;
   const potentialWinning = amount ? (Number(amount) * odds).toFixed(2) : '0.00';
+  const potentialPoints = Math.ceil(Math.abs(challenge.points) / 2) * multiplier;
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -56,7 +59,8 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
         targetUserId,
         challenge.id,
         numAmount,
-        odds
+        odds,
+        multiplier
       );
       setSuccess(true);
       setTimeout(() => {
@@ -78,7 +82,10 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
         </button>
 
         <h2 className="text-2xl font-bold text-white mb-2">Piazza Scommessa</h2>
-        <p className="text-purple-400 font-medium mb-6 text-sm">{challenge.title}</p>
+        <p className="text-purple-400 font-medium mb-2 text-sm">{challenge.title}</p>
+        <p className="text-gray-400 text-xs mb-6 flex items-center gap-1">
+          <span className="text-yellow-500">⏱</span> Scade in 12 ore!
+        </p>
 
         {success ? (
           <div className="bg-green-900/40 border border-green-500/50 text-green-200 p-6 rounded-xl text-center space-y-2">
@@ -109,28 +116,44 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Importo (TripMoney)</label>
-              <input 
-                type="number" 
-                min="1" 
-                step="1"
-                value={amount} 
-                onChange={e => setAmount(e.target.value)} 
-                required
-                placeholder="Es. 50"
-                className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-              />
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Importo (TripMoney)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  placeholder="Es. 50"
+                  required
+                />
+              </div>
+              <div className="w-24">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Volte (x)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={multiplier}
+                  onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
+                  className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-purple-500 text-center"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="bg-gray-950/50 p-4 rounded-xl border border-gray-800 flex justify-between items-center">
+            <div className="bg-gray-950/50 p-4 rounded-xl border border-gray-800 flex justify-between items-center mt-2">
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Quota</p>
                 <p className="text-lg font-bold text-gray-300">x{odds.toFixed(2)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-purple-400 uppercase font-semibold">Vincita Potenziale</p>
-                <p className="text-2xl font-black text-green-400">{potentialWinning} TM</p>
+                <p className="text-xs text-purple-400 uppercase font-semibold">Vincita (TM)</p>
+                <p className="text-2xl font-black text-green-400">{potentialWinning}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-purple-400 uppercase font-semibold">Bonus Punti</p>
+                <p className="text-2xl font-black text-purple-400">+{potentialPoints}</p>
               </div>
             </div>
 
