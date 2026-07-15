@@ -1,15 +1,23 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Onboarding from './components/Onboarding';
-import LeagueHub from './pages/LeagueHub';
-import LeagueDashboard from './pages/LeagueDashboard';
-import LeagueAdminPanel from './pages/LeagueAdminPanel';
-import LeaderboardPage from './pages/LeaderboardPage';
-import RulesPage from './pages/RulesPage';
-import BetsHistoryPage from './pages/BetsHistoryPage';
-import ChallengesHistoryPage from './pages/ChallengesHistoryPage';
-import LeagueLayout from './components/LeagueLayout';
+import { Suspense, lazy } from 'react';
+
+const Login = lazy(() => import('./pages/Login'));
+const Onboarding = lazy(() => import('./components/Onboarding'));
+const LeagueHub = lazy(() => import('./pages/LeagueHub'));
+const LeagueDashboard = lazy(() => import('./pages/LeagueDashboard'));
+const LeagueAdminPanel = lazy(() => import('./pages/LeagueAdminPanel'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
+const RulesPage = lazy(() => import('./pages/RulesPage'));
+const BetsHistoryPage = lazy(() => import('./pages/BetsHistoryPage'));
+const ChallengesHistoryPage = lazy(() => import('./pages/ChallengesHistoryPage'));
+const LeagueLayout = lazy(() => import('./components/LeagueLayout'));
+
+const Loader = () => (
+  <div className="min-h-screen bg-gray-950 flex items-center justify-center text-purple-500 font-bold text-xl animate-pulse">
+    Caricamento...
+  </div>
+);
 
 const ProtectedRoute = ({ requireDbUser = true }: { requireDbUser?: boolean }) => {
   const { firebaseUser, dbUser, loading } = useAuth();
@@ -40,28 +48,30 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route element={<ProtectedRoute requireDbUser={false} />}>
-            <Route path="/onboarding" element={<Onboarding />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requireDbUser={true} />}>
-            <Route path="/hub" element={<LeagueHub />} />
+        <Suspense fallback={<Loader />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
             
-            <Route element={<LeagueLayout />}>
-              <Route path="/league/:leagueId/dashboard" element={<LeagueDashboard />} />
-              <Route path="/league/:leagueId/leaderboard" element={<LeaderboardPage />} />
-              <Route path="/league/:leagueId/bets" element={<BetsHistoryPage />} />
-              <Route path="/league/:leagueId/history" element={<ChallengesHistoryPage />} />
-              <Route path="/league/:leagueId/rules" element={<RulesPage />} />
-              <Route path="/league/:leagueId/admin" element={<LeagueAdminPanel />} />
+            <Route element={<ProtectedRoute requireDbUser={false} />}>
+              <Route path="/onboarding" element={<Onboarding />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+            <Route element={<ProtectedRoute requireDbUser={true} />}>
+              <Route path="/hub" element={<LeagueHub />} />
+              
+              <Route element={<LeagueLayout />}>
+                <Route path="/league/:leagueId/dashboard" element={<LeagueDashboard />} />
+                <Route path="/league/:leagueId/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/league/:leagueId/bets" element={<BetsHistoryPage />} />
+                <Route path="/league/:leagueId/history" element={<ChallengesHistoryPage />} />
+                <Route path="/league/:leagueId/rules" element={<RulesPage />} />
+                <Route path="/league/:leagueId/admin" element={<LeagueAdminPanel />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );
