@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import type { Challenge, LeagueMember } from '../types';
-import { createChallenge, resolveEvent, deleteLeague, updateMemberRole, assignCustomPoints, distributeDailyAllowance, revokeEvent } from '../services/db';
+import { createChallenge, resolveEvent, deleteLeague, updateMemberRole, assignCustomPoints, distributeDailyAllowance, revokeEvent, kickMember, updateLeaguePassword } from '../services/db';
 
 export default function LeagueAdminPanel() {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -37,8 +37,11 @@ export default function LeagueAdminPanel() {
   
   // Form Custom Points
   const [customUserId, setCustomUserId] = useState('');
-  const [customPoints, setCustomPoints] = useState<number | ''>('');
   const [customMsg, setCustomMsg] = useState('');
+  
+  // Form Password
+  const [newPassword, setNewPassword] = useState('');
+  const [pwdMsg, setPwdMsg] = useState('');
 
   useEffect(() => {
     const initPanel = async () => {
@@ -179,6 +182,32 @@ export default function LeagueAdminPanel() {
     }
   };
 
+  const handleKickMember = async (userId: string) => {
+    if (!leagueId) return;
+    if (!window.confirm("Sei sicuro di voler espellere questo giocatore dalla lega?")) return;
+    try {
+      await kickMember(leagueId, userId);
+      setRoleMsg('Giocatore espulso.');
+      setMembers(members.filter(m => m.userId !== userId));
+      setTimeout(() => setRoleMsg(''), 3000);
+    } catch (err) {
+      setRoleMsg('Errore durante l\'espulsione.');
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leagueId || !newPassword) return;
+    try {
+      await updateLeaguePassword(leagueId, newPassword);
+      setPwdMsg('Password aggiornata!');
+      setNewPassword('');
+      setTimeout(() => setPwdMsg(''), 3000);
+    } catch (err) {
+      setPwdMsg('Errore aggiornamento password.');
+    }
+  };
+
   const handleDeleteLeague = async () => {
     if (!leagueId) return;
     if (window.confirm("Sei sicuro di voler ELIMINARE DEFINITIVAMENTE questa lega? Tutti i dati (sfide, giocatori, scommesse) verranno distrutti irreversibilmente.")) {
@@ -230,9 +259,9 @@ export default function LeagueAdminPanel() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Descrizione</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Descrizione (Opzionale)</label>
                 <textarea 
-                  required value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                  value={description} onChange={e => setDescription(e.target.value)} rows={3}
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
                   placeholder="Dettagli aggiuntivi sull'azione..."
                 />
@@ -411,11 +440,33 @@ export default function LeagueAdminPanel() {
                           Retrocedi a Player
                         </button>
                       )}
+                      <button onClick={() => handleKickMember(m.userId)} className="text-sm bg-red-900/40 hover:bg-red-800 text-red-200 px-3 py-1 rounded cursor-pointer transition-colors">
+                        Espelli
+                      </button>
                     </div>
                   )}
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div className="bg-gray-900 border border-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl mt-8">
+            <h2 className="text-2xl font-semibold text-white mb-2">Impostazioni Lega</h2>
+            <p className="text-gray-400 text-sm mb-6">Cambia la password di accesso alla lega.</p>
+            
+            <form onSubmit={handleChangePassword} className="flex flex-col sm:flex-row gap-4 max-w-lg">
+              <input 
+                type="text" required value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                className="flex-1 bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                placeholder="Nuova password"
+              />
+              <button type="submit" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg">
+                Cambia Password
+              </button>
+            </form>
+            {pwdMsg && <div className="text-sm font-medium text-gray-300 mt-2">{pwdMsg}</div>}
           </div>
         )}
 

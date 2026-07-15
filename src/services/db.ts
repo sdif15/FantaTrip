@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction, writeBatch, increment, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction, writeBatch, increment, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import type { User, League, LeagueMember, Bet, Challenge } from '../types';
 
@@ -95,6 +95,20 @@ export async function updateMemberRole(leagueId: string, userId: string, newRole
   const memberId = `${leagueId}_${userId}`;
   const memberRef = doc(db, 'league_members', memberId);
   await updateDoc(memberRef, { role: newRole });
+}
+
+export async function kickMember(leagueId: string, userId: string): Promise<void> {
+  const memberId = `${leagueId}_${userId}`;
+  const memberRef = doc(db, 'league_members', memberId);
+  
+  // Non si può eliminare il creatore (l'unico con userId == adminId nella lega vera e propria,
+  // ma per sicurezza l'admin rimuove solo i 'player' o 'co-admin' dall'UI).
+  await deleteDoc(memberRef);
+}
+
+export async function updateLeaguePassword(leagueId: string, newPassword: string): Promise<void> {
+  const leagueRef = doc(db, 'leagues', leagueId);
+  await updateDoc(leagueRef, { password: newPassword });
 }
 
 export async function resolveEvent(leagueId: string, targetUserId: string, challengeId: string, multiplier: number = 1): Promise<void> {

@@ -17,6 +17,7 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [targetUserId, setTargetUserId] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
+  const [myTripMoney, setMyTripMoney] = useState<number>(0);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -33,6 +34,12 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
       const q = query(collection(db, 'league_members'), where('leagueId', '==', leagueId));
       const snap = await getDocs(q);
       const fetched = snap.docs.map(doc => doc.data() as LeagueMember);
+      
+      const me = fetched.find(m => m.userId === firebaseUser.uid);
+      if (me) {
+        setMyTripMoney(me.tripMoney);
+      }
+
       // Escludi l'utente corrente dalla lista dei possibili target
       setMembers(fetched.filter(m => m.userId !== firebaseUser.uid));
     };
@@ -46,6 +53,11 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
     const numAmount = Number(amount);
     if (numAmount <= 0) {
       setError('L\'importo deve essere maggiore di zero.');
+      return;
+    }
+    
+    if (numAmount > myTripMoney) {
+      setError(`Non hai abbastanza TripMoney. Saldo attuale: ${myTripMoney} TM`);
       return;
     }
 
@@ -93,6 +105,12 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
             <p className="font-bold text-lg">Scommessa piazzata!</p>
             <p className="text-sm opacity-80">I TripMoney sono stati prelevati dal tuo saldo.</p>
           </div>
+        ) : myTripMoney <= 0 ? (
+          <div className="bg-red-900/40 border border-red-500/50 text-red-200 p-6 rounded-xl text-center space-y-2">
+            <div className="text-3xl mb-2">💸</div>
+            <p className="font-bold text-lg">Sei al verde!</p>
+            <p className="text-sm opacity-80">Non hai abbastanza TripMoney per scommettere. Chiedi all'Admin se può sganciare la paghetta!</p>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -118,10 +136,11 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
 
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Importo (TripMoney)</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Importo (Max {myTripMoney})</label>
                 <input 
                   type="number" 
                   min="1"
+                  max={myTripMoney}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-purple-500"
