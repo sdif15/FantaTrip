@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { Challenge } from '../types';
 import { calculateOdds } from '../services/oddsCalculator';
+import BettingModal from './BettingModal';
 
 interface Props {
   leagueId: string;
@@ -10,6 +11,7 @@ interface Props {
 
 export default function ChallengeList({ leagueId }: Props) {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'challenges'), where('leagueId', '==', leagueId));
@@ -64,7 +66,10 @@ export default function ChallengeList({ leagueId }: Props) {
                     <span className="text-xs text-gray-500 uppercase font-semibold">Quota</span>
                     <span className="text-xl font-black text-green-400">x{odds.toFixed(2)}</span>
                   </div>
-                  <button className="bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg shadow-purple-900/20 active:scale-95">
+                  <button 
+                    onClick={() => setSelectedChallenge(challenge)}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg shadow-purple-900/20 active:scale-95"
+                  >
                     Scommetti
                   </button>
                 </div>
@@ -73,6 +78,14 @@ export default function ChallengeList({ leagueId }: Props) {
           })
         )}
       </div>
+
+      {selectedChallenge && (
+        <BettingModal 
+          leagueId={leagueId} 
+          challenge={selectedChallenge} 
+          onClose={() => setSelectedChallenge(null)} 
+        />
+      )}
     </div>
   );
 }

@@ -1,12 +1,60 @@
-import { collection, query, where, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { User, League, LeagueMember } from '../types';
+import { User, League, LeagueMember, Bet } from '../types';
 
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
   const usersRef = collection(db, 'users');
   const q = query(usersRef, where('username', '==', username));
   const querySnapshot = await getDocs(q);
   return querySnapshot.empty;
+}
+
+export async function placeBet(
+  leagueId: string, 
+  bettorId: string, 
+  targetUserId: string, 
+  challengeId: string, 
+  amount: number, 
+  odds: number
+): Promise<string> {
+  const bettorMemberId = `${leagueId}_${bettorId}`;
+  const bettorMemberRef = doc(db, 'league_members', bettorMemberId);
+  const newBetRef = doc(collection(db, 'bets'));
+
+  await runTransaction(db, async (transaction) => {
+    const memberDoc = await transaction.get(bettorMemberRef);
+    if (!memberDoc.exists()) {
+      throw new Error("Membro non trovato nella lega.");
+    }
+
+    const memberData = memberDoc.data() as LeagueMember;
+    
+    if (memberData.tripMoney < amount) {
+      throw new Error("Fondi insufficienti (TripMoney).");
+    }
+
+    // Dedurre i fondi
+    transaction.update(bettorMemberRef, {
+      tripMoney: memberData.tripMoney - amount
+    });
+
+    // Creare la scommessa
+    const bet: Bet = {
+      id: newBetRef.id,
+      leagueId,
+      bettorId,
+      targetUserId,
+      challengeId,
+      amount,
+      odds,
+      status: 'pending',
+      createdAt: Date.now()
+    };
+    
+    transaction.set(newBetRef, bet);
+  });
+
+  return newBetRef.id;
 }
 
 export async function createUserProfile(userId: string, data: Omit<User, 'id'>): Promise<void> {
