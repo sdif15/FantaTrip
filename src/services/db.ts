@@ -1,64 +1,65 @@
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
+import { User, League, LeagueMember } from '../types';
 
-/**
- * Controlla se un username è già in uso nella collection 'users'.
- * Ritorna true se l'username è disponibile (ovvero non esiste a db), false altrimenti.
- */
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
-  try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('username', '==', username));
-    const querySnapshot = await getDocs(q);
-    
-    // Se è vuoto, significa che nessun utente ha questo username, quindi è disponibile.
-    return querySnapshot.empty;
-  } catch (error) {
-    console.error('Errore durante il controllo dell\'username:', error);
-    throw error;
+  const usersRef = collection(db, 'users');
+  const q = query(usersRef, where('username', '==', username));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.empty;
+}
+
+export async function createUserProfile(userId: string, data: Omit<User, 'id'>): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await setDoc(userRef, {
+    id: userId,
+    ...data
+  });
+}
+
+export async function getUserProfile(userId: string): Promise<User | null> {
+  const userRef = doc(db, 'users', userId);
+  const snap = await getDoc(userRef);
+  if (snap.exists()) {
+    return snap.data() as User;
   }
+  return null;
 }
 
-// ============================================================================
-// PLACEHOLDERS PER LE ALTRE FUNZIONI FIRESTORE
-// ============================================================================
-
-// --- User Services ---
-export async function createUserProfile(userId: string, data: any): Promise<void> {
-  // TODO: implement
+export async function getUserLeagues(userId: string): Promise<LeagueMember[]> {
+  const membersRef = collection(db, 'league_members');
+  const q = query(membersRef, where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map(doc => doc.data() as LeagueMember);
 }
 
-export async function getUserProfile(userId: string): Promise<any> {
-  // TODO: implement
+// Per entrare in una lega
+export async function getLeagueByNameAndPassword(name: string, password?: string): Promise<League | null> {
+  const leaguesRef = collection(db, 'leagues');
+  // Firestore case-sensitive match per password
+  const q = query(leaguesRef, where('name', '==', name), where('password', '==', password || ''));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    return snap.docs[0].data() as League;
+  }
+  return null;
 }
 
-// --- League Services ---
-export async function createLeague(leagueData: any): Promise<string> {
-  // TODO: implement
-  return 'new_league_id';
+export async function createLeague(leagueData: Omit<League, 'id' | 'createdAt'>): Promise<string> {
+  const newLeagueRef = doc(collection(db, 'leagues'));
+  const league: League = {
+    ...leagueData,
+    id: newLeagueRef.id,
+    createdAt: Date.now()
+  };
+  await setDoc(newLeagueRef, league);
+  return newLeagueRef.id;
 }
 
-export async function joinLeague(userId: string, leagueName: string, password: string): Promise<boolean> {
-  // TODO: implement
-  return false;
-}
-
-export async function getLeagueMembers(leagueId: string): Promise<any[]> {
-  // TODO: implement
-  return [];
-}
-
-// --- Challenge & Bet Services ---
-export async function createChallenge(challengeData: any): Promise<string> {
-  // TODO: implement
-  return 'new_challenge_id';
-}
-
-export async function placeBet(betData: any): Promise<string> {
-  // TODO: implement
-  return 'new_bet_id';
-}
-
-export async function resolveChallenge(challengeId: string, winnerUserId: string): Promise<void> {
-  // TODO: implement
+export async function createLeagueMember(memberData: Omit<LeagueMember, 'id'>): Promise<string> {
+  const id = `${memberData.leagueId}_${memberData.userId}`;
+  const newMemberRef = doc(db, 'league_members', id);
+  const member: LeagueMember = { ...memberData, id };
+  await setDoc(newMemberRef, member);
+  return id;
 }
