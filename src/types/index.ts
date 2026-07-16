@@ -32,6 +32,7 @@ export interface Challenge {
   title: string;
   description: string;
   points: number;
+  betDurationHours?: number; // Durata personalizzata per scommessa, se non presente è 12
 }
 
 export interface Bet {
@@ -45,4 +46,5 @@ export interface Bet {
   multiplier?: number;
   status: 'pending' | 'won' | 'lost';
   createdAt: number;
+  expiresAt?: number; // Data di scadenza in timestamp. Se assente, calcolata come createdAt + 12h
 }

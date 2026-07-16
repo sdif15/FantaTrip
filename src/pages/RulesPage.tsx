@@ -39,9 +39,9 @@ export default function RulesPage() {
             </p>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
-                <span className="text-xl">🏃‍♂️</span>
+                <span className="text-xl">⏱️</span>
                 <div>
-                  <strong className="text-white">Facendo le sfide:</strong> Se porti a termine una sfida (dal vivo) e un Admin te la convalida, becchi tutti i punti previsti. Più volte la fai, più punti prendi!
+                  <strong className="text-white">Scadenza Scommesse:</strong> Ogni scommessa ha un tempo limite predefinito di <strong>12 ore</strong> (l'Admin può accorciarlo o allungarlo quando crea la sfida!). Se la persona su cui hai scommesso non completa l'azione entro il tempo limite, perderai in automatico la scommessa. Nel modale troverai sempre scritto quante ore hai a disposizione!
                 </div>
               </li>
               <li className="flex items-start gap-3">

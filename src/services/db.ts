@@ -16,7 +16,8 @@ export async function placeBet(
   challengeId: string,
   amount: number,
   odds: number,
-  multiplier: number = 1
+  multiplier: number = 1,
+  expiresAt?: number
 ): Promise<string> {
   const bettorMemberId = `${leagueId}_${bettorId}`;
   const bettorMemberRef = doc(db, 'league_members', bettorMemberId);
@@ -50,7 +51,8 @@ export async function placeBet(
       odds,
       multiplier,
       status: 'pending',
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      expiresAt: expiresAt || (Date.now() + 12 * 60 * 60 * 1000)
     };
 
     transaction.set(newBetRef, bet);
@@ -59,14 +61,14 @@ export async function placeBet(
   return newBetRef.id;
 }
 
-export async function createChallenge(challengeData: Omit<Challenge, 'id'>): Promise<string> {
-  const newRef = doc(collection(db, 'challenges'));
-  const challenge: Challenge = {
-    ...challengeData,
-    id: newRef.id,
-  };
-  await setDoc(newRef, challenge);
-  return newRef.id;
+export async function createChallenge(data: Omit<Challenge, 'id'>): Promise<string> {
+  const newChalRef = doc(collection(db, 'challenges'));
+  await setDoc(newChalRef, {
+    ...data,
+    id: newChalRef.id,
+    betDurationHours: data.betDurationHours || 12
+  });
+  return newChalRef.id;
 }
 
 export async function deleteLeague(leagueId: string): Promise<void> {
@@ -150,14 +152,14 @@ export async function resolveEvent(leagueId: string, targetUserId: string, chall
     timestamp: Date.now()
   });
 
-  // 3. Risolvi ogni scommessa (verificando la scadenza di 12h)
-  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-
+  // 3. Risolvi ogni scommessa (verificando la scadenza)
+  
   pendingBetsSnap.docs.forEach(betDoc => {
     const betData = betDoc.data();
+    const expiration = betData.expiresAt || (betData.createdAt + 12 * 60 * 60 * 1000);
 
     // Se la scommessa è scaduta, marcala come persa e non pagare
-    if (Date.now() - betData.createdAt > TWELVE_HOURS) {
+    if (Date.now() > expiration) {
       batch.update(betDoc.ref, { status: 'lost' });
       return;
     }

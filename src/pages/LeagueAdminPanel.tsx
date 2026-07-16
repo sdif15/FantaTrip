@@ -22,6 +22,7 @@ export default function LeagueAdminPanel() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [points, setPoints] = useState<number | ''>('');
+  const [betDurationHours, setBetDurationHours] = useState<number>(12);
   
   // Form Valida Evento
   const [targetUserId, setTargetUserId] = useState('');
@@ -93,18 +94,21 @@ export default function LeagueAdminPanel() {
         leagueId,
         title,
         description,
-        points: Number(points)
+        points: Number(points),
+        betDurationHours
       });
       setChallenges(prev => [...prev, {
         id: newChalId,
         leagueId,
         title,
         description,
-        points: Number(points)
+        points: Number(points),
+        betDurationHours
       }]);
       setTitle('');
       setDescription('');
       setPoints('');
+      setBetDurationHours(12);
       setCreateMsg('Sfida creata con successo!');
       setTimeout(() => setCreateMsg(''), 3000);
     } catch (err) {
@@ -268,13 +272,23 @@ export default function LeagueAdminPanel() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Punti (anche negativi)</label>
-                <input 
-                  type="number" required value={points} onChange={e => setPoints(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  placeholder="Es. 100 oppure -50"
-                />
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Punti (anche negativi)</label>
+                  <input 
+                    type="number" required value={points} onChange={e => setPoints(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    placeholder="Es. 100 oppure -50"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Durata Scommessa (Ore)</label>
+                  <input 
+                    type="number" required min="1" value={betDurationHours} onChange={e => setBetDurationHours(Number(e.target.value))}
+                    className="w-full bg-gray-950 border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    placeholder="Es. 12"
+                  />
+                </div>
               </div>
 
               <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-900/20">

@@ -3,15 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import type { Bet, LeagueMember, Challenge } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export default function BetsHistoryPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const { firebaseUser } = useAuth();
   const navigate = useNavigate();
   
   const [bets, setBets] = useState<Bet[]>([]);
   const [members, setMembers] = useState<Record<string, LeagueMember>>({});
   const [challenges, setChallenges] = useState<Record<string, Challenge>>({});
   const [sortBy, setSortBy] = useState<'status' | 'newest'>('status');
+  const [filterMode, setFilterMode] = useState<'mine' | 'others'>('mine');
 
   useEffect(() => {
     if (!leagueId) return;
@@ -41,10 +44,12 @@ export default function BetsHistoryPage() {
   const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
   const enrichedBets = bets.map(bet => {
-    const isExpired = bet.status === 'pending' && (Date.now() - bet.createdAt > TWELVE_HOURS);
+    const expiration = bet.expiresAt || (bet.createdAt + TWELVE_HOURS);
+    const isExpired = bet.status === 'pending' && (Date.now() > expiration);
     return {
       ...bet,
       computedStatus: isExpired ? 'expired' : bet.status,
+      computedExpiration: expiration
     };
   });
 
@@ -59,6 +64,10 @@ export default function BetsHistoryPage() {
       return b.createdAt - a.createdAt;
     }
   });
+
+  const displayedBets = sortedBets.filter(b => 
+    filterMode === 'mine' ? b.bettorId === firebaseUser?.uid : b.bettorId !== firebaseUser?.uid
+  );
 
   const getStatusBadge = (status: string) => {
     switch(status) {
@@ -95,11 +104,26 @@ export default function BetsHistoryPage() {
           </div>
         </header>
 
+        <div className="flex bg-gray-900 p-1 rounded-xl mb-6">
+          <button 
+            onClick={() => setFilterMode('mine')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${filterMode === 'mine' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+          >
+            Le mie scommesse
+          </button>
+          <button 
+            onClick={() => setFilterMode('others')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${filterMode === 'others' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+          >
+            Scommesse degli altri
+          </button>
+        </div>
+
         <div className="space-y-4">
-          {sortedBets.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">Nessuna scommessa registrata in questa lega.</p>
+          {displayedBets.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">Nessuna scommessa trovata in questa sezione.</p>
           ) : (
-            sortedBets.map(bet => {
+            displayedBets.map(bet => {
               const bettorName = members[bet.bettorId]?.username || 'Sconosciuto';
               const targetName = members[bet.targetUserId]?.username || 'Sconosciuto';
               const challengeTitle = challenges[bet.challengeId]?.title || 'Sfida Eliminata';
@@ -107,14 +131,17 @@ export default function BetsHistoryPage() {
               return (
                 <div key={bet.id} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
                       {getStatusBadge(bet.computedStatus)}
-                      <span className="text-gray-500 text-xs">{new Date(bet.createdAt).toLocaleString()}</span>
+                      <span className="text-gray-500 text-xs">Piazzata: {new Date(bet.createdAt).toLocaleString()}</span>
+                      {bet.computedStatus === 'pending' && (
+                        <span className="text-yellow-500/80 text-xs">Scade: {new Date(bet.computedExpiration).toLocaleString()}</span>
+                      )}
                     </div>
                     <p className="text-white font-medium">
-                      <span className="text-purple-400">{bettorName}</span> ha scommesso su <span className="text-blue-400">{targetName}</span>
+                      <span className="text-purple-400">{bettorName}</span> ha scommesso su <span className="text-blue-400">{targetName}</span> <span className="text-gray-500 font-normal">(x{bet.multiplier || 1})</span>
                     </p>
-                    <p className="text-gray-400 text-sm">Sfida: "{challengeTitle}"</p>
+                    <p className="text-gray-400 text-sm mt-1">Sfida: "{challengeTitle}"</p>
                   </div>
                   <div className="text-right bg-gray-950 p-3 rounded-lg border border-gray-800 min-w-[120px]">
                     <p className="text-xs text-gray-500 uppercase font-semibold">Importo</p>

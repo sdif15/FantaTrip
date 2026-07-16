@@ -65,6 +65,9 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
     setLoading(true);
 
     try {
+      const durationHours = challenge.betDurationHours || 12;
+      const expiresAt = Date.now() + durationHours * 60 * 60 * 1000;
+
       await placeBet(
         leagueId,
         firebaseUser.uid,
@@ -72,7 +75,8 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
         challenge.id,
         numAmount,
         odds,
-        multiplier
+        multiplier,
+        expiresAt
       );
       setSuccess(true);
       setTimeout(() => {
@@ -94,10 +98,7 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
         </button>
 
         <h2 className="text-2xl font-bold text-white mb-2">Piazza Scommessa</h2>
-        <p className="text-purple-400 font-medium mb-2 text-sm">{challenge.title}</p>
-        <p className="text-gray-400 text-xs mb-6 flex items-center gap-1">
-          <span className="text-yellow-500">⏱</span> Scade in 12 ore!
-        </p>
+        <p className="text-purple-400 font-medium mb-6 text-sm">{challenge.title}</p>
 
         {success ? (
           <div className="bg-green-900/40 border border-green-500/50 text-green-200 p-6 rounded-xl text-center space-y-2">
@@ -148,7 +149,7 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
                   required
                 />
               </div>
-              <div className="w-24">
+              <div className="w-1/3">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Volte (x)</label>
                 <input 
                   type="number" 
@@ -160,6 +161,8 @@ export default function BettingModal({ leagueId, challenge, onClose }: Props) {
                 />
               </div>
             </div>
+
+            <p className="text-yellow-500/80 text-sm font-bold flex items-center gap-1">⏱️ Scade in {challenge.betDurationHours || 12} ore!</p>
 
             <div className="bg-gray-950/50 p-4 rounded-xl border border-gray-800 flex justify-between items-center mt-2">
               <div>
