@@ -126,7 +126,8 @@ export default function LeagueAdminPanel() {
       setCreateMsg('Sfida, eventi e scommesse eliminati con successo!');
       setTimeout(() => setCreateMsg(''), 4000);
     } catch (err) {
-      setCreateMsg('Errore durante l\'eliminazione della sfida.');
+      console.error("Errore durante l'eliminazione della sfida:", err);
+      setCreateMsg('Errore durante l\'eliminazione della sfida. Controlla la console per i dettagli.');
     }
   };
 

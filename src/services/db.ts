@@ -83,7 +83,6 @@ export async function deleteChallenge(leagueId: string, challengeId: string): Pr
   // 1. Recupera tutte le validazioni (eventi)
   const eventsQ = query(
     collection(db, 'completed_challenges'), 
-    where('leagueId', '==', leagueId),
     where('challengeId', '==', challengeId)
   );
   const eventsSnap = await getDocs(eventsQ);
@@ -91,7 +90,6 @@ export async function deleteChallenge(leagueId: string, challengeId: string): Pr
   // 2. Recupera tutte le scommesse
   const betsQ = query(
     collection(db, 'bets'),
-    where('leagueId', '==', leagueId),
     where('challengeId', '==', challengeId)
   );
   const betsSnap = await getDocs(betsQ);
