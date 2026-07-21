@@ -25,7 +25,8 @@ export default function LeagueDashboard() {
         
         if (snap.exists()) {
           setIsMember(true);
-          setIsAdmin(snap.data().role === 'admin');
+          const role = snap.data().role;
+          setIsAdmin(role === 'admin' || role === 'co-admin');
 
           const leagueRef = doc(db, 'leagues', leagueId);
           const leagueSnap = await getDoc(leagueRef);

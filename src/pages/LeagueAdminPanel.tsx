@@ -53,12 +53,18 @@ export default function LeagueAdminPanel() {
         const memberRef = doc(db, 'league_members', memberId);
         const snap = await getDoc(memberRef);
         
-        if (!snap.exists() || (snap.data().role !== 'admin' && snap.data().role !== 'co-admin')) {
+        if (!snap.exists()) {
+          navigate(`/league/${leagueId}/dashboard`);
+          return;
+        }
+        
+        const role = snap.data().role;
+        if (role !== 'admin' && role !== 'co-admin') {
           navigate(`/league/${leagueId}/dashboard`);
           return;
         }
         setIsAdmin(true);
-        setIsSuperAdmin(snap.data().role === 'admin');
+        setIsSuperAdmin(role === 'admin');
 
         const memQ = query(collection(db, 'league_members'), where('leagueId', '==', leagueId));
         const memSnap = await getDocs(memQ);
