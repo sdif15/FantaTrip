@@ -97,8 +97,8 @@ service cloud.firestore {
       // Solo l'Admin della lega può aggiornare le scommesse (per segnarle 'won' in resolveEvent)
       allow update: if isAuthenticated() && isAdmin(resource.data.leagueId);
       
-      // Nessuno elimina scommesse per non alterare lo storico
-      allow delete: if false; 
+      // L'Admin può eliminare le scommesse (necessario quando si fa la deep delete di una sfida)
+      allow delete: if isAuthenticated() && isAdmin(resource.data.leagueId);
     }
 
     // --- COMPLETED CHALLENGES ---
