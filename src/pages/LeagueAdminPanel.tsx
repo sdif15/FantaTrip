@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import type { Challenge, LeagueMember } from '../types';
-import { createChallenge, resolveEvent, deleteLeague, updateMemberRole, assignCustomPoints, distributeDailyAllowance, revokeEvent, kickMember, updateLeaguePassword } from '../services/db';
+import { createChallenge, resolveEvent, deleteLeague, updateMemberRole, assignCustomPoints, distributeDailyAllowance, revokeEvent, kickMember, updateLeaguePassword, deleteChallenge } from '../services/db';
 
 export default function LeagueAdminPanel() {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -113,6 +113,20 @@ export default function LeagueAdminPanel() {
       setTimeout(() => setCreateMsg(''), 3000);
     } catch (err) {
       setCreateMsg('Errore nella creazione della sfida.');
+    }
+  };
+
+  const handleDeleteChallenge = async (chalId: string) => {
+    if (!leagueId) return;
+    if (!window.confirm("Attenzione! Eliminando questa sfida, tutte le scommesse e le validazioni associate verranno cancellate. I Punti e i TripMoney dei giocatori verranno ricalcolati come se la sfida non fosse mai esistita. Vuoi procedere?")) return;
+    try {
+      setCreateMsg('Eliminazione profonda in corso (ricalcolo scommesse)...');
+      await deleteChallenge(leagueId, chalId);
+      setChallenges(prev => prev.filter(c => c.id !== chalId));
+      setCreateMsg('Sfida, eventi e scommesse eliminati con successo!');
+      setTimeout(() => setCreateMsg(''), 4000);
+    } catch (err) {
+      setCreateMsg('Errore durante l\'eliminazione della sfida.');
     }
   };
 
@@ -462,6 +476,35 @@ export default function LeagueAdminPanel() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div className="bg-gray-900 border border-gray-800 p-6 sm:p-8 rounded-2xl shadow-xl mt-8">
+            <h2 className="text-2xl font-semibold text-white mb-2">Gestione Sfide Esistenti</h2>
+            <p className="text-gray-400 text-sm mb-6">Visualizza o elimina le sfide attualmente attive nella lega.</p>
+            
+            <div className="space-y-3">
+              {challenges.length === 0 ? (
+                <p className="text-sm text-gray-500">Nessuna sfida creata.</p>
+              ) : (
+                challenges.map(c => (
+                  <div key={c.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800 gap-4">
+                    <div>
+                      <span className="text-white font-bold">{c.title}</span>
+                      <span className="ml-2 text-xs px-2 py-1 bg-purple-900/30 text-purple-400 rounded-full">{c.points} PT</span>
+                      <p className="text-gray-500 text-xs mt-1">Durata scommessa: {c.betDurationHours || 12}h</p>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteChallenge(c.id)} 
+                      className="text-sm bg-red-900/40 hover:bg-red-800 text-red-200 px-3 py-1 rounded cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                      Elimina Sfida
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

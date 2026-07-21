@@ -71,6 +71,84 @@ export async function createChallenge(data: Omit<Challenge, 'id'>): Promise<stri
   return newChalRef.id;
 }
 
+export async function deleteChallenge(leagueId: string, challengeId: string): Promise<void> {
+  const chalRef = doc(db, 'challenges', challengeId);
+  const chalSnap = await getDoc(chalRef);
+  
+  if (!chalSnap.exists()) return;
+  const challengeData = chalSnap.data() as Challenge;
+
+  const batch = writeBatch(db);
+
+  // 1. Recupera tutte le validazioni (eventi)
+  const eventsQ = query(
+    collection(db, 'completed_challenges'), 
+    where('leagueId', '==', leagueId),
+    where('challengeId', '==', challengeId)
+  );
+  const eventsSnap = await getDocs(eventsQ);
+
+  // 2. Recupera tutte le scommesse
+  const betsQ = query(
+    collection(db, 'bets'),
+    where('leagueId', '==', leagueId),
+    where('challengeId', '==', challengeId)
+  );
+  const betsSnap = await getDocs(betsQ);
+
+  // Array di tracking per i net diffs (evita problemi di overlap update sullo stesso doc nel batch)
+  const userDiffs: Record<string, { points: number, tripMoney: number }> = {};
+
+  const getDiff = (userId: string) => {
+    if (!userDiffs[userId]) userDiffs[userId] = { points: 0, tripMoney: 0 };
+    return userDiffs[userId];
+  };
+
+  // 3. Calcola rimborsi validazioni
+  eventsSnap.docs.forEach(docSnap => {
+    const ev = docSnap.data();
+    getDiff(ev.userId).points -= ev.points; // Togli i punti guadagnati
+    batch.delete(docSnap.ref);
+  });
+
+  // 4. Calcola rimborsi scommesse
+  betsSnap.docs.forEach(docSnap => {
+    const bet = docSnap.data() as Bet;
+    const diff = getDiff(bet.bettorId);
+    
+    // Rimborsa sempre i soldi giocati originariamente
+    diff.tripMoney += bet.amount;
+
+    if (bet.status === 'won') {
+      // Se era vinta, dobbiamo togliergli le vincite
+      const winnings = Math.round(bet.amount * bet.odds);
+      const pointsWon = Math.ceil(Math.abs(challengeData.points) / 2);
+      
+      diff.tripMoney -= winnings;
+      diff.points -= pointsWon;
+    }
+    
+    batch.delete(docSnap.ref);
+  });
+
+  // 5. Applica i net diffs ai membri
+  Object.keys(userDiffs).forEach(userId => {
+    const diff = userDiffs[userId];
+    if (diff.points === 0 && diff.tripMoney === 0) return;
+    
+    const memberRef = doc(db, 'league_members', `${leagueId}_${userId}`);
+    batch.update(memberRef, {
+      points: increment(diff.points),
+      tripMoney: increment(diff.tripMoney)
+    });
+  });
+
+  // 6. Elimina la sfida
+  batch.delete(chalRef);
+
+  await batch.commit();
+}
+
 export async function deleteLeague(leagueId: string): Promise<void> {
   const batch = writeBatch(db);
 
