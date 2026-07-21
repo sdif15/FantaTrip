@@ -129,17 +129,20 @@ export async function deleteChallenge(leagueId: string, challengeId: string): Pr
     batch.delete(docSnap.ref);
   });
 
-  // 5. Applica i net diffs ai membri
-  Object.keys(userDiffs).forEach(userId => {
+  // 5. Applica i net diffs ai membri (solo se esistono ancora nella lega)
+  for (const userId of Object.keys(userDiffs)) {
     const diff = userDiffs[userId];
-    if (diff.points === 0 && diff.tripMoney === 0) return;
+    if (diff.points === 0 && diff.tripMoney === 0) continue;
     
     const memberRef = doc(db, 'league_members', `${leagueId}_${userId}`);
-    batch.update(memberRef, {
-      points: increment(diff.points),
-      tripMoney: increment(diff.tripMoney)
-    });
-  });
+    const memberSnap = await getDoc(memberRef);
+    if (memberSnap.exists()) {
+      batch.update(memberRef, {
+        points: increment(diff.points),
+        tripMoney: increment(diff.tripMoney)
+      });
+    }
+  }
 
   // 6. Elimina la sfida
   batch.delete(chalRef);
